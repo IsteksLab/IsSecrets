@@ -1,0 +1,4 @@
+termcolor
+base58
+requests
+cryptography
