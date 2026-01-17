@@ -39,13 +39,13 @@ def hash():
       config["tampered"] = True
   else:
     config["tampered"] = 404
-    with open("config.json", "w") as w:
-      json.dump(config, w, indent=4)
+  with open("config.json", "w") as w:
+    json.dump(config, w, indent=4)
 
 def lock():
   global password
   hash()
-  if config["aes"]["passwordHash"] == None:
+  if config["aes"]["passHash"] == None:
     print(colored("""
 ██╗░██████╗░██████╗███████╗░█████╗░██████╗░███████╗████████╗░██████╗
 ██║██╔════╝██╔════╝██╔════╝██╔══██╗██╔══██╗██╔════╝╚══██╔══╝██╔════╝
@@ -69,7 +69,7 @@ def lock():
       print(colored("Password - Insecure", "red", attrs=["bold"]))
       time.sleep(1)
       clear()
-    elif len(password.decode("utf-8")) > 8 and <= 11:
+    elif len(password.decode("utf-8")) > 8 and len(password.decode("utf-8")) <= 11:
       print(colored("Password - Moderate", "yellow", attrs=["bold"]))
       time.sleep(1)
       clear()
@@ -78,7 +78,7 @@ def lock():
       time.sleep(1)
       clear()
     salt = os.urandom(config["aes"]["salt"])
-    config["aes"]["passwordHash"] = salt.hex() + (pbkdf2_hmac("sha256", password, salt, config["aes"]["iterations"], dklen=32)).hex()
+    config["aes"]["passHash"] = f"{salt.hex()}{(pbkdf2_hmac("sha256", password, salt, config["aes"]["iterations"], dklen=32)).hex()}"
     with open("config.json", "w") as w:
       json.dump(config, w, indent=4)
     menu()
@@ -100,7 +100,7 @@ def lock():
         print(colored("Variant: Unknown", "yellow", attrs=["bold"]))
       print(colored("\n---\n", "white", attrs=["bold"]))
       password = bytearray(getpass.getpass(colored("Enter your Password: ", "white", attrs=["bold"])).encode("utf-8"))
-      if pbkdf2_hmac("sha256", password, bytes.fromhex(config["aes"]["passwordHash"][0:(config["aes"]["salt"] - 1)]), config["aes"]["iterations"], dklen=32).hex() == config["aes"]["passwordHash"][(config["aes"]["salt"] - 1):]:
+      if pbkdf2_hmac("sha256", password, bytes.fromhex(config["aes"]["passHash"][:(config["aes"]["salt"] * 2)]), config["aes"]["iterations"], dklen=32).hex() == config["aes"]["passHash"][(config["aes"]["salt"] * 2):]:
         print(colored("Password Correct!", "green", attrs=["bold"]))
         time.sleep(1)
         clear()
@@ -127,17 +127,15 @@ def secrets(title, sensitive, password):
   secret["body"]["title"] = salt.hex() + nonce.hex() + aes.encrypt(nonce, title.encode("utf-8"), None).hex()
   nonce = os.urandom(config["aes"]["nonce"])
   secret["body"]["secret"] = salt.hex() + nonce.hex() + aes.encrypt(nonce, sensitive.encode("utf-8"), None).hex()
-
-  salt = os.urandom(config["aes"]["salt"])
   with open(f"{config["aes"]["directory"]}/{sha256(secret["id"].encode("utf-8")).hexdigest()[:10]}.json", "w") as w:
     json.dump(secret, w, indent=4)
   passHash[:] =  b"\x00" * len(passHash)
   del passHash
 
 def reveal(sensitive, password):
-  salt = sensitive[0:len(config["aes"]["salt"] - 1)]
-  nonce = sensitive[len(config["aes"]["salt"] - 1):len(config["aes"]["nonce"] - 1)]
-  ciphertext = sensitive[len(config["aes"]["nonce"] - 1):]
+  salt = bytes.fromhex(sensitive[:(config["aes"]["salt"] * 2)])
+  nonce = bytes.fromhex(sensitive[(config["aes"]["salt"] * 2):(config["aes"]["salt"] * 2 + config["aes"]["nonce"] * 2)])
+  ciphertext = bytes.fromhex(sensitive[(config["aes"]["nonce"] * 2 + config["aes"]["salt"] * 2):])
 
   passHash = bytearray(pbkdf2_hmac("sha256", password, salt, config["aes"]["iterations"], dklen=32))
   aes = AESGCM(passHash)
@@ -156,7 +154,7 @@ def view():
       secrets = json.load(r)
     SECRETS.append(secrets)
   for index, id in enumerate(SECRETS, start=1):
-    print(colored(f"\nIndex: {index}\nID: {id}\n", "white", attrs=["bold"]))
+    print(colored(f"\nIndex: {index}\nID: {id.get("id")}\n", "white", attrs=["bold"]))
   print(colored("---", "white", attrs=["bold"]))
 
 def menu():
@@ -193,8 +191,8 @@ def menu():
         with open(f"{config["aes"]["directory"]}/{sha256(select.encode("utf-8")).hexdigest()[:10]}.json", "r") as r:
           confidential = json.load(r)
         clear()
-        print(colored(f"ID: {confidential["id"]}\nTimestamp: {datetime.fromtimestamp(confidential["timestamp"])}\nTitle: {reveal(bytes.fromhex(confidential["body"]["title"]), password)}\nSecret: {reveal(bytes.fromhex(confidential["body"]["secret"]), password)}\n\n", "white", attrs=["bold"]))
-        action = input("(L to Leave): ", "white", attrs=["bold"]))
+        print(colored(f"ID: {confidential["id"]}\nTimestamp: {datetime.fromtimestamp(confidential["timestamp"])}\nTitle: {reveal(confidential["body"]["title"], password)}\nSecret: {reveal(confidential["body"]["secret"], password)}\n\n", "white", attrs=["bold"]))
+        action = input(colored("(L to Leave): ", "white", attrs=["bold"]))
         if action.upper() == "L":
           clear()
         else:
