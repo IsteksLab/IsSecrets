@@ -3,9 +3,9 @@
     "version": 1,
     "developer": "ISTEK",
     "github": "https://github.com/IsteksLab/IsSecrets",
-    "external": "https://raw.githubusercontent.com/IsteksLab/IsDebt/refs/heads/main/config.json",
+    "external": "https://raw.githubusercontent.com/IsteksLab/IsSecrets/refs/heads/main/config.json",
     "created": 1768550850,
-    "verifyHash": "b7e41ef6da338a51d81439d8dcc48b43de9ed4967356641f9a3510a5b4d7b370"
+    "verifyHash": "29f44dfa3d320c2f2e1af319680d05669edd4c9af762a543a290de8c410efbf0"
   },
   "aes": {
     "iterations": 225000,
