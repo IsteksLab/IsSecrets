@@ -1,5 +1,5 @@
+import os, sys, json, time, getpass, copy, base58, requests, ctypes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-import os, sys, json, time, getpass, copy, base58, requests
 from hashlib import sha256, pbkdf2_hmac
 from termcolor import colored
 from datetime import datetime
@@ -64,7 +64,7 @@ def lock():
     print(colored("""\n
 █▀ █▀▀ █▀▀ █░█ █▀█ █ ▀█▀ █▄█
 ▄█ ██▄ █▄▄ █▄█ █▀▄ █ ░█░ ░█░\n\n""", "white", attrs=["bold"]))
-    password = bytearray(getpass.getpass(colored("Create A New Password: ", "white", attrs=["bold"])).encode("utf-8"))
+    password = ctypes.create_string_buffer(getpass.getpass(colored("Create A New Password: ", "white", attrs=["bold"])).encode("utf-8"))
     if len(password.decode("utf-8")) <= 8:
       print(colored("Password - Insecure", "red", attrs=["bold"]))
       time.sleep(1)
@@ -99,7 +99,7 @@ def lock():
       else:
         print(colored("Variant: Unknown", "yellow", attrs=["bold"]))
       print(colored("\n---\n", "white", attrs=["bold"]))
-      password = bytearray(getpass.getpass(colored("Enter your Password: ", "white", attrs=["bold"])).encode("utf-8"))
+      password = ctypes.create_string_buffer(getpass.getpass(colored("Enter your Password: ", "white", attrs=["bold"])).encode("utf-8"))
       if pbkdf2_hmac("sha256", password, bytes.fromhex(config["aes"]["passHash"][:(config["aes"]["salt"] * 2)]), config["aes"]["iterations"], dklen=32).hex() == config["aes"]["passHash"][(config["aes"]["salt"] * 2):]:
         print(colored("Password Correct!", "green", attrs=["bold"]))
         time.sleep(1)
@@ -120,7 +120,7 @@ def secrets(title, sensitive, password):
   secret["metadata"]["encryption"] = config["aes"]["encryption"]
 
   salt = os.urandom(config["aes"]["salt"])
-  passHash = bytearray(pbkdf2_hmac("sha256", password, salt, config["aes"]["iterations"], dklen=32))
+  passHash = ctypes.create_string_buffer(pbkdf2_hmac("sha256", password, salt, config["aes"]["iterations"], dklen=32))
   aes = AESGCM(passHash)
   
   nonce = os.urandom(config["aes"]["nonce"])
@@ -129,19 +129,17 @@ def secrets(title, sensitive, password):
   secret["body"]["secret"] = salt.hex() + nonce.hex() + aes.encrypt(nonce, sensitive.encode("utf-8"), None).hex()
   with open(f"{config["aes"]["directory"]}/{sha256(secret["id"].encode("utf-8")).hexdigest()[:10]}.json", "w") as w:
     json.dump(secret, w, indent=4)
-  passHash[:] =  b"\x00" * len(passHash)
-  del passHash
+  ctypes.memset(ctypes.addressof(passHash), 0, len(passHash))
 
 def reveal(sensitive, password):
   salt = bytes.fromhex(sensitive[:(config["aes"]["salt"] * 2)])
   nonce = bytes.fromhex(sensitive[(config["aes"]["salt"] * 2):(config["aes"]["salt"] * 2 + config["aes"]["nonce"] * 2)])
   ciphertext = bytes.fromhex(sensitive[(config["aes"]["nonce"] * 2 + config["aes"]["salt"] * 2):])
 
-  passHash = bytearray(pbkdf2_hmac("sha256", password, salt, config["aes"]["iterations"], dklen=32))
+  passHash = ctypes.create_string_buffer(pbkdf2_hmac("sha256", password, salt, config["aes"]["iterations"], dklen=32))
   aes = AESGCM(passHash)
   plaintext = aes.decrypt(nonce, ciphertext, None).decode("utf-8")
-  passHash[:] = b"\x00" * len(passHash)
-  del passHash
+  ctypes.memset(ctypes.addressof(passHash), 0, len(passHash))
   return plaintext
 
 def view():
@@ -169,7 +167,7 @@ def menu():
     option = input(colored(">> ", "white", attrs=["bold"]))
     if option.upper() in ["X", "[X]"]:
       clear()
-      password[:] = b"\x00" * len(password)
+      ctypes.memset(ctypes.addressof(password), 0, len(password))
       sys.exit(0)
     elif option.upper() in ["N", "[N]"]:
       clear()
